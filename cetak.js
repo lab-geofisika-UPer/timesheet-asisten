@@ -130,7 +130,7 @@ function docInsentif(kode, ym) {
       const s = sumSesi(ks.filter(k => k.e.nim === nim)); tot += s;
       return `<tr style="height:${ttd ? 34 : 24}px"><td>${i + 1}</td><td>${esc(nim)}</td><td class="kiri">${esc(namaOf(nim))}</td><td>${esc(c.prodi)}</td>
         ${semuaKol.map(k => { const v = sel(nim, k); return `<td>${v ? angka(v) : ''}</td>`; }).join('')}<td>${angka(s)}</td><td>${rpMemo(s * c.tarif)}</td>
-        ${ttd ? `<td style="text-align:${i % 2 ? 'right' : 'left'}">${i + 1}.</td>` : ''}</tr>`;
+        ${ttd ? `<td style="text-align:${i % 2 ? 'right' : 'left'};white-space:nowrap">${i + 1}.${(db.ttd || {})[nim] ? ` <img src="${(db.ttd || {})[nim]}" alt="" style="height:28px;max-width:96px;vertical-align:middle">` : ''}</td>` : ''}</tr>`;
     }).join('');
     return `<div class="pg land xl"><div class="fit" data-tinggi="1"><table class="judul">${[`REKAP ABSENSI ASISTEN PRAKTIKUM SEMESTER ${String(c.semester).toUpperCase()} TA. ${c.ta}`, p.judul, c.unit, `BULAN ${bulanID(ym).toUpperCase()}`].map(t => `<tr><td>${esc(t)}</td></tr>`).join('')}</table>
       <table style="margin-top:22px"><tr class="biru"><td rowspan="2">NO</td><td rowspan="2">NIM ASPRAK</td><td rowspan="2">NAMA ASPRAK</td><td rowspan="2">PRODI</td>

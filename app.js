@@ -18,7 +18,7 @@ const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const STATUS = {draf: 'Draf', dikirim: 'Menunggu tinjauan', revisi: 'Perlu revisi', disetujui: 'Disetujui'};
 const KOSONG = {cfg: {semester: 'Ganjil', ta: '', prodi: 'Teknik Geofisika', unit: 'LABORATORIUM GEOFISIKA-UNIVERSITAS PERTAMINA',
   direktorat: 'DIREKTORAT KEMAHASISWAAN DAN ALUMNI', menit: 50, tarif: 30000, kaprodi: '', nipKaprodi: '', dekan: '', nipDekan: '',
-  bank: '', norek: '', atasNama: '', kepada: 'Manajer Pelayanan Mahasiswa', kota: 'Jakarta'}, prak: [], asisten: [], lap: []};
+  bank: '', norek: '', atasNama: '', kepada: 'Manajer Pelayanan Mahasiswa', kota: 'Jakarta'}, prak: [], asisten: [], lap: [], ttd: {}};
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -128,6 +128,7 @@ function vSaya() {
   return `<h1>Laporan saya</h1><p class="sub">${esc(namaOf(ui.peran))} (NIM <span class="mono">${esc(ui.peran)}</span>). Isi satu laporan untuk setiap modul yang Anda kerjakan; jam kerja diisi sesuai yang Anda lakukan sendiri.</p>
   <div class="acts" style="margin-bottom:6px"><button class="btn primary" data-act="baru">+ Isi laporan modul</button></div>
   <div class="sum" style="max-width:640px"><div><b>${mine.length}</b><span>laporan</span></div><div><b>${angka(s)}</b><span>sesi disetujui</span></div><div><b>${rp(s * db.cfg.tarif)}</b><span>insentif disetujui</span></div></div>
+  ${kartuTtd()}
   ${mine.some(e => e.status === 'revisi') ? '<div class="msg warn">Ada laporan yang diminta revisi. Buka, perbaiki, lalu kirim ulang.</div>' : ''}
   ${mine.length ? `<div class="list" style="margin-top:14px">${mine.map(e => `<button class="card it" data-buka="${e.id}">
      <b>${esc(modulLabel(e))}, ${esc(prakOf(e.praktikum).memo || e.praktikum)}</b><span class="sub">${esc(e.modul_judul || '')}</span>
@@ -155,6 +156,72 @@ function dialogBaru() {
         rinciOtomatis(e); db.lap.push(e); simpan();
       }
       ui.id = e.id; ui.langkah = 'jam'; tampil();
+    }
+    d.remove();
+  };
+}
+/* ---------- ASISTEN: tanda tangan (gambar di layar atau unggah foto) ---------- */
+function kartuTtd() {
+  const t = (db.ttd || {})[ui.peran];
+  return `<section class="card it" style="max-width:640px"><b>Tanda tangan</b><div class="row">
+    <span class="sub">${t ? 'Dipakai di kolom TANDA TANGAN berkas Insentif.' : 'Belum ada. Dibutuhkan untuk berkas Insentif.'}</span>
+    ${t ? `<img src="${t}" alt="Tanda tangan Anda" style="max-height:44px;max-width:150px">` : ''}
+    <button class="btn sm ${t ? '' : 'primary'}" data-act="ttd">${t ? 'Ganti' : 'Buat tanda tangan'}</button></div></section>`;
+}
+// latar kertas dibuat transparan lalu dipangkas, supaya rapi di sel tabel
+function bersihkanTtd(src) {
+  const c = document.createElement('canvas'), s = Math.min(1, 600 / src.width, 300 / src.height);
+  c.width = Math.max(1, Math.round(src.width * s)); c.height = Math.max(1, Math.round(src.height * s));
+  const x = c.getContext('2d'); x.drawImage(src, 0, 0, c.width, c.height);
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  let jml = 0, n = 0;
+  for (let i = 0; i < p.length; i += 4) if (p[i + 3] > 40) { jml += p[i] + p[i + 1] + p[i + 2]; n++; }
+  const rata = n ? jml / n : 0, batas = rata > 300 ? 0.7 * rata : Infinity; // foto kertas (rata-rata terang): tinta jauh lebih gelap; gambar di layar: semua goresan dipakai
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] <= 40 || p[i] + p[i + 1] + p[i + 2] > batas) { p[i + 3] = 0; continue; }
+    p[i + 3] = 255; const k = (i / 4) % c.width, j = Math.floor(i / 4 / c.width);
+    if (k < x0) x0 = k; if (k > x1) x1 = k; if (j < y0) y0 = j; if (j > y1) y1 = j;
+  }
+  if (x1 < 0) return '';
+  x.putImageData(d, 0, 0);
+  const o = document.createElement('canvas'); o.width = x1 - x0 + 9; o.height = y1 - y0 + 9;
+  o.getContext('2d').drawImage(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 4, 4, x1 - x0 + 1, y1 - y0 + 1);
+  return o.toDataURL('image/png');
+}
+function dialogTtd() {
+  const d = document.createElement('dialog');
+  d.innerHTML = `<form method="dialog"><h3>Tanda tangan</h3><p class="sub" style="margin-top:0">Gambar dengan jari atau mouse di kotak putih, atau unggah foto tanda tangan di kertas putih (tinta gelap).</p>
+    <canvas width="600" height="240" aria-label="Kotak tanda tangan" style="display:block;width:100%;aspect-ratio:5/2;background:#fff;border:1px solid var(--border);border-radius:12px;touch-action:none;cursor:crosshair"></canvas>
+    <div class="acts" style="justify-content:space-between"><span class="acts" style="margin:0"><button type="button" class="btn sm" data-t="ulang">Ulangi</button><button type="button" class="btn sm" data-t="unggah">Unggah foto</button></span>
+    <span class="acts" style="margin:0"><button class="btn" value="batal">Batal</button><button class="btn primary" value="ok">Simpan</button></span></div></form>`;
+  document.body.appendChild(d); d.showModal();
+  const c = d.querySelector('canvas'), x = c.getContext('2d'); let akhir = null, ada = false;
+  const gaya = () => { x.lineWidth = 3.5; x.lineCap = x.lineJoin = 'round'; x.strokeStyle = x.fillStyle = '#111'; }; gaya();
+  const pos = ev => { const r = c.getBoundingClientRect(); return [(ev.clientX - r.left) * c.width / r.width, (ev.clientY - r.top) * c.height / r.height]; };
+  c.onpointerdown = ev => { try { c.setPointerCapture(ev.pointerId); } catch (x) { /* pointer sudah lepas */ } akhir = pos(ev); x.beginPath(); x.arc(akhir[0], akhir[1], 1.7, 0, 7); x.fill(); ada = true; };
+  c.onpointermove = ev => { if (!akhir) return; const q = pos(ev); x.beginPath(); x.moveTo(...akhir); x.lineTo(...q); x.stroke(); akhir = q; };
+  c.onpointerup = c.onpointercancel = () => { akhir = null; };
+  d.querySelector('[data-t=ulang]').onclick = () => { x.clearRect(0, 0, c.width, c.height); ada = false; };
+  d.querySelector('[data-t=unggah]').onclick = async () => {
+    const [f] = await pilihFile('image/*'); if (!f) return;
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onerror = () => { URL.revokeObjectURL(url); alert('Foto tidak bisa dibaca.'); };
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const bersih = new Image(); bersih.onload = () => {
+        x.clearRect(0, 0, c.width, c.height); const s = Math.min(1, (c.width - 20) / bersih.width, (c.height - 20) / bersih.height);
+        x.drawImage(bersih, (c.width - bersih.width * s) / 2, (c.height - bersih.height * s) / 2, bersih.width * s, bersih.height * s); gaya(); ada = true;
+      };
+      const v = bersihkanTtd(img); if (!v) return alert('Tidak ada tanda tangan yang terbaca di foto itu.'); bersih.src = v;
+    };
+    img.src = url;
+  };
+  d.onclose = () => {
+    if (d.returnValue === 'ok') {
+      const v = ada && bersihkanTtd(c);
+      if (!v) alert('Kotak tanda tangan masih kosong.');
+      else { (db.ttd = db.ttd || {})[ui.peran] = v; simpan(); tampil(); toast('Tanda tangan tersimpan.'); }
     }
     d.remove();
   };
@@ -296,6 +363,7 @@ function periksaLap(e) { // aturan yang sama dengan yang dicek keuangan
 function kiriman(e) {
   const o = JSON.parse(JSON.stringify(e)); o.versi = 2; o.dikirim = new Date().toISOString();
   o.kegiatan.forEach(k => delete k.ubah);
+  const t = (db.ttd || {})[e.nim]; if (t) o.ttd = t; // ikut ke koordinator untuk kolom TANDA TANGAN
   return o;
 }
 
@@ -357,6 +425,7 @@ function imporKiriman(files) {
         penulis: !!k.penulis, laporan: k.penulis ? k.laporan : null, status: 'dikirim', catatan: lama?.catatan || '', riwayat: [...(lama?.riwayat || []), ...(k.riwayat || []).slice(-5)]};
       e.riwayat.push({t: new Date().toISOString(), oleh: 'Koordinator', aksi: 'impor file kiriman'});
       if (lama) db.lap.splice(db.lap.indexOf(lama), 1, e); else db.lap.push(e);
+      if (/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(k.ttd || '') && k.ttd.length < 400000) (db.ttd = db.ttd || {})[k.nim] = k.ttd;
       n++;
     }
   }))).then(() => { simpan(); tampil(); if (pesan.length) alert(`${n} laporan masuk.\n\nDilewati:\n- ` + pesan.join('\n- ')); else toast(`${n} laporan masuk, menunggu tinjauan.`); });
@@ -400,6 +469,7 @@ document.addEventListener('click', async ev => {
   if (d.hapusas) { const x = db.asisten[+d.hapusas]; if (!confirm(`Hapus ${x.nama || 'asisten'} (${x.nim || 'tanpa NIM'}) dari ${x.prak}? Laporan yang sudah ada tidak ikut terhapus.`)) return; db.asisten.splice(+d.hapusas, 1); simpan(); isiPeran(); return tampil(); }
   switch (d.act) {
     case 'baru': return dialogBaru();
+    case 'ttd': return dialogTtd();
     case 'kembali': ui.id = null; return tampil();
     case 'tambahKeg': { const a = e.kegiatan[e.kegiatan.length - 1] || {}; e.kegiatan.push({kategori: 'Evaluasi', tanggal: a.tanggal || '', mulai: '', selesai: '', rincian: '', link: ''}); rinciOtomatis(e); simpan(); return tampil(); }
     case 'tambahBag': e.laporan.bagian.push({judul: '', teks: '', foto: [], tetap: false}); simpan(); return tampil();
