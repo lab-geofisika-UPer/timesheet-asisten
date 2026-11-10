@@ -164,7 +164,7 @@ function dialogBaru() {
 function kartuTtd() {
   const t = (db.ttd || {})[ui.peran];
   return `<section class="card it" style="max-width:640px"><b>Tanda tangan</b><div class="row">
-    <span class="sub">${t ? 'Dipakai di kolom TANDA TANGAN berkas Insentif.' : 'Belum ada. Dibutuhkan untuk berkas Insentif.'}</span>
+    <span class="sub">${t ? 'Dipakai di berkas Absensi dan Insentif.' : 'Belum ada. Dibutuhkan untuk berkas Absensi dan Insentif.'}</span>
     ${t ? `<img src="${t}" alt="Tanda tangan Anda" style="max-height:44px;max-width:150px">` : ''}
     <button class="btn sm ${t ? '' : 'primary'}" data-act="ttd">${t ? 'Ganti' : 'Buat tanda tangan'}</button></div></section>`;
 }
