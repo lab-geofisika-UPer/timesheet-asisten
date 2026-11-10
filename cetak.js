@@ -110,7 +110,7 @@ function docAbsensi(kode, ym, ks = kegBulan(kode, ym)) {
       <tr class="biru"><td>No.</td><td>Tanggal</td><td>Kategori Kegiatan</td><td>Rincian Kegiatan</td><td>Waktu Mulai</td><td>Waktu Selesai</td><td>Jumlah Jam Kerja</td><td>Tautan Dokumen Output Pekerjaan</td></tr>
       ${isi}<tr class="kuning"><td colspan="6" class="b">Grand Total Jam Kerja Bulan ${bln}</td><td class="b">${durasi(total)}</td><td></td></tr></table>
       <div class="ttd"><div><b>Penanggungjawab</b><br>Ketua Program Studi ${esc(c.prodi)}<div class="nm">${esc(c.kaprodi)}</div><b>NIP. ${esc(c.nipKaprodi)}</b></div>
-        <div><b>Mahasiswa</b><br>Asisten Praktikum<div class="nm">${esc(namaOf(nim))}</div><b>NIM. ${esc(nim)}</b></div></div></div></div>`;
+        <div><b>Mahasiswa</b><br>Asisten Praktikum${(db.ttd || {})[nim] ? `<img src="${(db.ttd || {})[nim]}" alt="" style="display:block;height:64px;max-width:220px;object-fit:contain;margin:4px auto"><div class="nm" style="margin-top:0">` : '<div class="nm">'}${esc(namaOf(nim))}</div><b>NIM. ${esc(nim)}</b></div></div></div></div>`;
   }).join('');
 }
 function docInsentif(kode, ym) {
