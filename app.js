@@ -53,6 +53,9 @@ const labelNo = no => NAMA_MODUL[no] || 'Modul ' + no;
 const modulLabel = e => labelNo(e.modul_no);
 const modulPanjang = e => modulLabel(e) + (e.modul_judul ? ' - ' + e.modul_judul : '');
 const prakOf = kode => db.prak.find(p => p.kode === kode) || {kode, nama: kode, judul: kode, memo: kode};
+// kode berakhiran -A/-B = kelas GPA/GPB dari satu mata kuliah (Judul Rekap sama); digabung di Memo, dipisah per lembar
+const kelasOf = kode => { const m = /-([A-Z])$/.exec(kode || ''); return m ? 'GP' + m[1] : ''; };
+const labelPrak = kode => { const p = prakOf(kode), k = kelasOf(kode); return (p.memo || p.nama || kode) + (k ? ' ' + k : ''); };
 const namaOf = nim => (db.asisten.find(a => a.nim === nim) || {nama: nim}).nama;
 const urutModul = no => ({KL: 97, Ujian: 99})[no] || +no || 98;
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
@@ -96,7 +99,7 @@ function isiPeran() {
   $('#sem').textContent = `Semester ${db.cfg.semester || '-'}, TA ${db.cfg.ta || '-'}`;
   const grup = db.prak.map(p => {
     const as = db.asisten.filter(a => a.prak === p.kode);
-    return as.length ? `<optgroup label="Asisten ${esc(p.memo || p.nama)}">${as.map(a => `<option value="${esc(a.nim)}">${esc(a.nama)}</option>`).join('')}</optgroup>` : '';
+    return as.length ? `<optgroup label="Asisten ${esc(labelPrak(p.kode))}">${as.map(a => `<option value="${esc(a.nim)}">${esc(a.nama)}</option>`).join('')}</optgroup>` : '';
   }).join('');
   $('#peran').innerHTML = (ON ? '<option value="">Pilih nama Anda…</option>' : '') + '<option value="koordinator">Koordinator / Aslab</option>' + grup;
   if (![...$('#peran').options].some(o => o.value === ui.peran)) ui.peran = ON ? '' : 'koordinator';
@@ -131,7 +134,7 @@ function vSaya() {
   ${kartuTtd()}
   ${mine.some(e => e.status === 'revisi') ? '<div class="msg warn">Ada laporan yang diminta revisi. Buka, perbaiki, lalu kirim ulang.</div>' : ''}
   ${mine.length ? `<div class="list" style="margin-top:14px">${mine.map(e => `<button class="card it" data-buka="${e.id}">
-     <b>${esc(modulLabel(e))}, ${esc(prakOf(e.praktikum).memo || e.praktikum)}</b><span class="sub">${esc(e.modul_judul || '')}</span>
+     <b>${esc(modulLabel(e))}, ${esc(labelPrak(e.praktikum))}</b><span class="sub">${esc(e.modul_judul || '')}</span>
      <div class="row"><span class="sub meta"><span>${angka(totalJam(e))} jam</span><span>${angka(totalSesi(e))} sesi</span>${e.penulis ? '<span>penulis LPJ</span>' : ''}</span>${badge(e.status)}</div></button>`).join('')}</div>`
     : '<div class="card empty">Belum ada laporan. Tekan <b>+ Isi laporan modul</b> setelah selesai mengerjakan satu modul.</div>'}`;
 }
@@ -139,7 +142,7 @@ function dialogBaru() {
   const pr = prakSaya();
   const d = document.createElement('dialog');
   d.innerHTML = `<form method="dialog"><h3>Laporan modul baru</h3>
-    <div class="f"><label class="l" for="dPr">Praktikum</label><select id="dPr">${pr.map(k => `<option value="${esc(k)}">${esc(prakOf(k).memo || k)}</option>`).join('')}</select></div>
+    <div class="f"><label class="l" for="dPr">Praktikum</label><select id="dPr">${pr.map(k => `<option value="${esc(k)}">${esc(labelPrak(k))}</option>`).join('')}</select></div>
     <div class="f"><label class="l" for="dMo">Modul</label><select id="dMo">${[...Array(12)].map((_, i) => `<option value="${i + 1}">Modul ${i + 1}</option>`).join('')}<option value="KL">Kuliah Lapangan</option><option value="Ujian">Ujian Praktikum</option></select></div>
     <div class="acts" style="justify-content:flex-end"><button class="btn" value="batal">Batal</button><button class="btn primary" value="ok">Lanjut</button></div></form>`;
   document.body.appendChild(d); d.showModal();
@@ -277,7 +280,7 @@ function vEdit() {
       ${lpj ? `<div class="prev">${lpj}</div>` : `<div class="card empty">${e.penulis ? 'Isi tanggal dan jam kegiatan Pelaksanaan dulu.' : 'LPJ modul ini ditulis asisten lain; pratinjau muncul setelah laporannya ada di perangkat ini.'}</div>`}`;
   }
   return `<p style="margin:12px 0 0"><button class="btn sm" data-act="kembali">← Laporan saya</button></p>
-  <div class="head"><div class="grow"><h1>${esc(modulLabel(e))}</h1><p class="sub meta" style="margin:0"><span>${esc(prakOf(e.praktikum).memo || e.praktikum)}</span><span>${esc(namaOf(e.nim))}</span>${badge(e.status)}</p></div></div>
+  <div class="head"><div class="grow"><h1>${esc(modulLabel(e))}</h1><p class="sub meta" style="margin:0"><span>${esc(labelPrak(e.praktikum))}</span><span>${esc(namaOf(e.nim))}</span>${badge(e.status)}</p></div></div>
   ${e.status === 'revisi' ? `<div class="msg warn"><b>Catatan koordinator:</b> ${esc(e.catatan)}</div>` : ''}
   ${e.status === 'dikirim' ? '<div class="msg info">Sudah dikirim, menunggu tinjauan koordinator. Jika koordinator memakai perangkat lain, tekan <b>Unduh file kiriman</b> lalu kirimkan filenya.</div>' : ''}
   ${e.status === 'disetujui' ? '<div class="msg ok">Disetujui dan ikut dihitung dalam insentif.</div>' : ''}
@@ -340,7 +343,7 @@ function periksaLap(e) { // aturan yang sama dengan yang dicek keuangan
     if (k.kategori === 'Pelaksanaan' && !/^https?:\/\//.test(String(k.link).trim())) err.push(`${n}: link output wajib diisi (diawali https://).`);
     e.kegiatan.forEach((o, j) => { if (j > i && bertumpuk(k, o)) err.push(`Kegiatan ${i + 1} dan ${j + 1}: jamnya bertumpuk.`); });
     db.lap.filter(x => x !== e && x.nim === e.nim).forEach(x => x.kegiatan.forEach(o => {
-      if (bertumpuk(k, o)) err.push(`${n}: bertumpuk dengan kegiatan di laporan ${prakOf(x.praktikum).memo || x.praktikum} ${modulLabel(x)}.`);
+      if (bertumpuk(k, o)) err.push(`${n}: bertumpuk dengan kegiatan di laporan ${labelPrak(x.praktikum)} ${modulLabel(x)}.`);
     }));
   });
   if (e.penulis) {
@@ -376,10 +379,10 @@ function vTinjau() {
   return `<h1>Tinjau laporan asisten</h1><p class="sub">Hanya laporan <b>disetujui</b> yang dihitung di Absensi, Insentif, LPJ, dan Memo.</p>
   <div class="g2" style="max-width:640px">
     <div><label class="l" for="fSt">Status</label><select id="fSt" data-filter="filter"><option value="">Semua (${db.lap.length})</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${ui.filter === k ? 'selected' : ''}>${v} (${n(k)})</option>`).join('')}</select></div>
-    <div><label class="l" for="fPr">Praktikum</label><select id="fPr" data-filter="fprak"><option value="">Semua praktikum</option>${db.prak.map(p => `<option value="${esc(p.kode)}" ${ui.fprak === p.kode ? 'selected' : ''}>${esc(p.memo || p.nama)}</option>`).join('')}</select></div></div>
+    <div><label class="l" for="fPr">Praktikum</label><select id="fPr" data-filter="fprak"><option value="">Semua praktikum</option>${db.prak.map(p => `<option value="${esc(p.kode)}" ${ui.fprak === p.kode ? 'selected' : ''}>${esc(labelPrak(p.kode))}</option>`).join('')}</select></div></div>
   <div class="acts"><button class="btn" data-act="imporKiriman">Impor file kiriman asisten</button>${n('dikirim') ? `<button class="btn ok" data-act="setujuiSemua">Setujui semua yang tampil &amp; lolos cek (${daftar.filter(e => e.status === 'dikirim' && !periksaLap(e).length).length})</button>` : ''}</div>
   <section class="card"><div class="tablewrap"><table class="t"><thead><tr><th>Asisten</th><th>Praktikum</th><th>Modul</th><th class="n">Jam</th><th class="n">Sesi</th><th>LPJ</th><th>Status</th><th></th></tr></thead><tbody>
-  ${daftar.map(e => `<tr><td>${esc(namaOf(e.nim))}</td><td>${esc(prakOf(e.praktikum).memo || e.praktikum)}</td><td>${esc(modulLabel(e))}</td>
+  ${daftar.map(e => `<tr><td>${esc(namaOf(e.nim))}</td><td>${esc(labelPrak(e.praktikum))}</td><td>${esc(modulLabel(e))}</td>
     <td class="n">${angka(totalJam(e))}</td><td class="n">${angka(totalSesi(e))}</td><td>${e.penulis ? 'Penulis' : '—'}</td><td>${badge(e.status)}</td>
     <td><button class="btn sm" data-buka="${e.id}">Lihat</button></td></tr>`).join('') || '<tr><td colspan="8" class="empty">Tidak ada laporan dengan saringan ini.</td></tr>'}
   </tbody></table></div></section>`;
@@ -395,7 +398,7 @@ function vDetail() {
     document.body.appendChild(b);
   });
   return `<p style="margin:12px 0 0"><button class="btn sm" data-act="kembali">← Tinjau</button></p>
-  <div class="head"><div class="grow"><h1>${esc(namaOf(e.nim))}</h1><p class="sub meta" style="margin:0"><span>${esc(prakOf(e.praktikum).memo || e.praktikum)}</span><span>${esc(modulPanjang(e))}</span>${badge(e.status)}</p></div>
+  <div class="head"><div class="grow"><h1>${esc(namaOf(e.nim))}</h1><p class="sub meta" style="margin:0"><span>${esc(labelPrak(e.praktikum))}</span><span>${esc(modulPanjang(e))}</span>${badge(e.status)}</p></div>
     <div class="acts" style="margin-top:14px"><button class="btn sm" data-act="prevAbs">Pratinjau Absensi</button>${e.penulis ? '<button class="btn sm" data-act="prevLpj">Pratinjau LPJ</button>' : ''}</div></div>
   ${err.length ? `<div class="msg ${e.status === 'disetujui' ? 'warn' : 'err'}"><b>${e.status === 'disetujui' ? 'Catatan pemeriksaan (laporan sudah disetujui):' : 'Belum bisa disetujui:'}</b><ul>${err.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '<div class="msg ok">Lolos semua pemeriksaan otomatis.</div>'}
   ${e.catatan ? `<div class="msg warn"><b>Catatan revisi terakhir:</b> ${esc(e.catatan)}</div>` : ''}

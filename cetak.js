@@ -20,7 +20,11 @@ function perModul(ks) { // kelompok per modul, urut tanggal kegiatan pertama
   ks.slice().sort((a, b) => (a.tanggal + a.mulai).localeCompare(b.tanggal + b.mulai)).forEach(k => (g[k.e.modul_no] = g[k.e.modul_no] || []).push(k));
   return Object.entries(g).sort((a, b) => (a[1][0].tanggal + a[1][0].mulai).localeCompare(b[1][0].tanggal + b[1][0].mulai));
 }
-const praktikumPeriode = () => db.prak.filter(p => bulanDalam(ui.dari, ui.sampai).some(ym => kegBulan(p.kode, ym).length));
+const praktikumPeriode = () => { // kelas satu mata kuliah (Judul Rekap sama) dibuat berurutan: GPA lalu GPB
+  const ada = db.prak.filter(p => bulanDalam(ui.dari, ui.sampai).some(ym => kegBulan(p.kode, ym).length)), j = ada.map(p => p.judul);
+  return ada.slice().sort((a, b) => j.indexOf(a.judul) - j.indexOf(b.judul));
+};
+const mkPeriode = () => { const g = new Map(); praktikumPeriode().forEach(p => g.set(p.judul, [...(g.get(p.judul) || []), p])); return [...g.values()]; };
 const modulPeriode = kode => [...new Set(disetujui().filter(e => e.praktikum === kode && e.kegiatan.some(k => dalamPeriode(k.tanggal))).map(e => e.modul_no))].sort((a, b) => urutModul(a) - urutModul(b));
 const penulisLPJ = (kode, no) => disetujui().filter(e => e.praktikum === kode && e.modul_no === no && e.penulis && e.laporan);
 
@@ -41,20 +45,21 @@ function isiBundel(k) {
   if (k === 'memo') return docMemo();
   if (k === 'absensi') return pr.map(p => bulanAda(p.kode).map(ym => docAbsensi(p.kode, ym)).join('')).join('');
   if (k === 'insentif') return pr.map(p => bulanAda(p.kode).map(ym => docInsentif(p.kode, ym)).join('')).join('');
-  if (k === 'laporan') return pr.map(p => modulPeriode(p.kode).map(no => semuaLPJ(p.kode, no)).join('')).join('');
+  if (k === 'laporan') return mkPeriode().map(ps => [...new Set(ps.flatMap(p => modulPeriode(p.kode)))].sort((a, b) => urutModul(a) - urutModul(b))
+    .map(no => ps.map(p => semuaLPJ(p.kode, no)).join('')).join('')).join('');
 }
 function vBerkas() {
   if (!ui.dari) { ui.dari = ui.sampai = hariIni().slice(0, 7); }
   const pr = praktikumPeriode(), cek = cekPeriode();
   let total = 0;
-  const baris = pr.map(p => {
-    const bl = bulanAda(p.kode);
+  const baris = mkPeriode().map(ps => { // satu baris per mata kuliah; tombol Absensi/Insentif mencetak semua kelasnya
+    const bl = bulanDalam(ui.dari, ui.sampai).filter(ym => ps.some(p => kegBulan(p.kode, ym).length)), kodes = ps.map(p => p.kode).join(',');
     return bl.map((ym, i) => {
-      const ks = kegBulan(p.kode, ym), s = sumSesi(ks); total += s;
-      return `<tr>${i === 0 ? `<td rowspan="${bl.length}"><b>${esc(p.memo || p.nama)}</b><div class="docbtns" style="margin-top:6px">${modulPeriode(p.kode).map(no =>
-        `<button class="btn sm" data-cetak="lpj" data-kode="${esc(p.kode)}" data-mod="${esc(no)}" ${penulisLPJ(p.kode, no).length ? '' : 'disabled title="Belum ada LPJ yang disetujui"'}>LPJ ${esc(NAMA_MODUL[no] ? labelNo(no) : 'M' + no)}${penulisLPJ(p.kode, no).length > 1 ? ` (${penulisLPJ(p.kode, no).length})` : ''}</button>`).join('')}</div></td>` : ''}
+      const ks = ps.flatMap(p => kegBulan(p.kode, ym)), s = sumSesi(ks); total += s;
+      return `<tr>${i === 0 ? `<td rowspan="${bl.length}"><b>${esc(ps[0].memo || ps[0].nama)}</b><div class="docbtns" style="margin-top:6px">${[...new Set(ps.flatMap(p => modulPeriode(p.kode)))].sort((a, b) => urutModul(a) - urutModul(b)).map(no => { const n = ps.reduce((t, p) => t + penulisLPJ(p.kode, no).length, 0);
+        return `<button class="btn sm" data-cetak="lpj" data-kode="${esc(kodes)}" data-mod="${esc(no)}" ${n ? '' : 'disabled title="Belum ada LPJ yang disetujui"'}>LPJ ${esc(NAMA_MODUL[no] ? labelNo(no) : 'M' + no)}${n > 1 ? ` (${n})` : ''}</button>`; }).join('')}</div></td>` : ''}
         <td style="white-space:nowrap">${bulanID(ym)}</td><td class="n">${urutAsisten(ks.map(k => k.e.nim)).length}</td><td class="n">${angka(s)}</td><td class="n">${rp(s * db.cfg.tarif)}</td>
-        <td><div class="docbtns"><button class="btn sm" data-cetak="absensi" data-kode="${esc(p.kode)}" data-ym="${ym}">Absensi</button><button class="btn sm" data-cetak="insentif" data-kode="${esc(p.kode)}" data-ym="${ym}">Insentif</button></div></td></tr>`;
+        <td><div class="docbtns"><button class="btn sm" data-cetak="absensi" data-kode="${esc(kodes)}" data-ym="${ym}">Absensi</button><button class="btn sm" data-cetak="insentif" data-kode="${esc(kodes)}" data-ym="${ym}">Insentif</button></div></td></tr>`;
     }).join('');
   }).join('');
   const hal = Object.fromEntries(BUNDEL.map(b => [b.k, pr.length ? (isiBundel(b.k).match(/class="pg /g) || []).length : 0]));
@@ -132,7 +137,7 @@ function docInsentif(kode, ym) {
         ${semuaKol.map(k => { const v = sel(nim, k); return `<td>${v ? angka(v) : ''}</td>`; }).join('')}<td>${angka(s)}</td><td>${rpMemo(s * c.tarif)}</td>
         ${ttd ? `<td style="text-align:${i % 2 ? 'right' : 'left'};white-space:nowrap">${i + 1}.${(db.ttd || {})[nim] ? ` <img src="${(db.ttd || {})[nim]}" alt="" style="height:28px;max-width:96px;vertical-align:middle">` : ''}</td>` : ''}</tr>`;
     }).join('');
-    return `<div class="pg land xl"><div class="fit" data-tinggi="1"><table class="judul">${[`REKAP ABSENSI ASISTEN PRAKTIKUM SEMESTER ${String(c.semester).toUpperCase()} TA. ${c.ta}`, p.judul, c.unit, `BULAN ${bulanID(ym).toUpperCase()}`].map(t => `<tr><td>${esc(t)}</td></tr>`).join('')}</table>
+    return `<div class="pg land xl"><div class="fit" data-tinggi="1"><table class="judul">${[`REKAP ABSENSI ASISTEN PRAKTIKUM SEMESTER ${String(c.semester).toUpperCase()} TA. ${c.ta}`, p.judul + (kelasOf(kode) ? ' KELAS ' + kelasOf(kode) : ''), c.unit, `BULAN ${bulanID(ym).toUpperCase()}`].map(t => `<tr><td>${esc(t)}</td></tr>`).join('')}</table>
       <table style="margin-top:22px"><tr class="biru"><td rowspan="2">NO</td><td rowspan="2">NIM ASPRAK</td><td rowspan="2">NAMA ASPRAK</td><td rowspan="2">PRODI</td>
         ${grup.map(g => `<td colspan="${g.kol.length}">${esc(g.label)}</td>`).join('')}<td rowspan="2">TOTAL (SESI)</td><td rowspan="2">TOTAL INSENTIF<br>(1 sesi ${tarifTeks})</td>${ttd ? '<td rowspan="2" style="width:120px">TANDA TANGAN</td>' : ''}</tr>
       <tr>${semuaKol.map(k => `<td class="kuning b">${+k.tanggal.slice(8)}</td>`).join('')}</tr>
@@ -149,7 +154,7 @@ function docLPJ(kode, no, e = penulisLPJ(kode, no)[0], nimsTambahan = []) {
   const nims = sendiri ? [e.nim] : urutAsisten([...disetujui().filter(x => x.praktikum === kode && x.modul_no === no).map(x => x.nim), ...nimsTambahan]);
   const judul = modulPanjang(e) + (String(L.topik || '').trim() ? ' - ' + L.topik.trim() : ''), tahun = hariIni().slice(0, 4);
   return `<div class="pg port wd"><table class="rp">
-    <thead><tr><td><div class="kop"><img src="assets/logo-lpj.png" alt="Universitas Pertamina"><div>LAPORAN PEMBELAJARAN<br>PRAKTIKUM ${esc(String(p.memo || p.nama).toUpperCase())}<br>${esc(judul.toUpperCase())}</div></div></td></tr></thead>
+    <thead><tr><td><div class="kop"><img src="assets/logo-lpj.png" alt="Universitas Pertamina"><div>LAPORAN PEMBELAJARAN<br>PRAKTIKUM ${esc(String(p.memo || p.nama).toUpperCase())}${kelasOf(kode) ? ' KELAS ' + kelasOf(kode) : ''}<br>${esc(judul.toUpperCase())}</div></div></td></tr></thead>
     <tfoot><tr><td><div class="kaki">© ${tahun} Teknik Geofisika, Universitas Pertamina.</div></td></tr></tfoot>
     <tbody><tr><td><div class="isi">
       <table class="idn" style="margin:0 0 12px 20px">
@@ -165,7 +170,7 @@ function docLPJ(kode, no, e = penulisLPJ(kode, no)[0], nimsTambahan = []) {
 }
 function rekapMemo() {
   const bl = bulanDalam(ui.dari, ui.sampai);
-  return praktikumPeriode().map(p => ({p, bulan: bl.map(ym => ({ym, rp: sumSesi(kegBulan(p.kode, ym)) * db.cfg.tarif}))}));
+  return mkPeriode().map(ps => ({p: ps[0], bulan: bl.map(ym => ({ym, rp: sumSesi(ps.flatMap(p => kegBulan(p.kode, ym))) * db.cfg.tarif}))}));
 }
 function docMemo() {
   const c = db.cfg, rk = rekapMemo(), total = rk.reduce((s, r) => s + r.bulan.reduce((t, b) => t + b.rp, 0), 0);
@@ -196,9 +201,10 @@ let judulAsli = document.title;
 function bukaCetak(jenis, d) {
   let html = '', nama = '';
   const per = `${ui.dari}_${ui.sampai}`;
-  if (jenis === 'absensi') { html = docAbsensi(d.kode, d.ym); nama = `Absensi_${d.kode}_${d.ym}`; }
-  if (jenis === 'insentif') { html = docInsentif(d.kode, d.ym); nama = `Insentif_${d.kode}_${d.ym}`; }
-  if (jenis === 'lpj') { html = semuaLPJ(d.kode, d.mod); nama = `LPJ_${d.kode}_${labelNo(d.mod).replace(/ /g, "")}`; }
+  const kodes = String(d.kode || '').split(',').filter(k => d.ym && kegBulan(k, d.ym).length), mk = String(d.kode || '').split(',')[0].replace(/-[A-Z]$/, '');
+  if (jenis === 'absensi') { html = kodes.map(k => docAbsensi(k, d.ym)).join(''); nama = `Absensi_${mk}_${d.ym}`; }
+  if (jenis === 'insentif') { html = kodes.map(k => docInsentif(k, d.ym)).join(''); nama = `Insentif_${mk}_${d.ym}`; }
+  if (jenis === 'lpj') { html = String(d.kode).split(',').map(k => semuaLPJ(k, d.mod)).join(''); nama = `LPJ_${mk}_${labelNo(d.mod).replace(/ /g, "")}`; } // GPA lalu GPB dalam satu file
   if (jenis === 'memo') { html = docMemo(); nama = `Memo_Insentif_${per}`; }
   const bd = BUNDEL.find(x => jenis === x.k + 'Semua');
   if (bd) { html = isiBundel(bd.k); nama = `${bd.judul.split(' ')[0]}_${per}`; }
