@@ -150,9 +150,10 @@ const semuaLPJ = (kode, no) => penulisLPJ(kode, no).map(e => docLPJ(kode, no, e)
 function docLPJ(kode, no, e = penulisLPJ(kode, no)[0], nimsTambahan = []) {
   const p = prakOf(kode); if (!e) return '';
   const L = e.laporan, pel = e.kegiatan.find(k => k.kategori === 'Pelaksanaan') || e.kegiatan[0];
-  const sendiri = String(L.topik || '').trim() || db.lap.some(x => x !== e && x.praktikum === kode && x.modul_no === no && x.penulis && x.laporan);
+  const sendiri = db.lap.some(x => x !== e && x.praktikum === kode && x.modul_no === no && x.penulis && x.laporan);
   const nims = sendiri ? [e.nim] : urutAsisten([...disetujui().filter(x => x.praktikum === kode && x.modul_no === no).map(x => x.nim), ...nimsTambahan]);
-  const judul = modulPanjang(e) + (String(L.topik || '').trim() ? ' - ' + L.topik.trim() : ''), tahun = hariIni().slice(0, 4);
+  const huruf = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, ''), topik = huruf(L.topik) && !huruf(modulPanjang(e)).includes(huruf(L.topik)) ? L.topik.trim() : ''; // topik = judul modul tidak diulang
+  const judul = modulPanjang(e) + (topik ? ' - ' + topik : ''), tahun = hariIni().slice(0, 4);
   return `<div class="pg port wd"><table class="rp">
     <thead><tr><td><div class="kop"><img src="assets/logo-lpj.png" alt="Universitas Pertamina"><div>LAPORAN PEMBELAJARAN<br>PRAKTIKUM ${esc(String(p.memo || p.nama).toUpperCase())}${kelasOf(kode) ? ' KELAS ' + kelasOf(kode) : ''}<br>${esc(judul.toUpperCase())}</div></div></td></tr></thead>
     <tfoot><tr><td><div class="kaki">© ${tahun} Teknik Geofisika, Universitas Pertamina.</div></td></tr></tfoot>
