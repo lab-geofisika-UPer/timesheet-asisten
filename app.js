@@ -393,7 +393,7 @@ function vDetail() {
   setTimeout(() => {
     const b = document.createElement('div'); b.className = 'bar';
     b.innerHTML = `<button class="btn" data-act="kembali">Kembali</button>` + (e.status === 'disetujui'
-      ? `<button class="btn" data-act="batalSetuju">Batalkan persetujuan</button>`
+      ? `<button class="btn" data-act="batalSetuju">Batalkan persetujuan</button><button class="btn" data-act="revisi">Minta revisi</button>`
       : `<button class="btn" data-act="revisi">Minta revisi</button><button class="btn primary" data-act="setujui" ${err.length ? 'disabled title="Masih ada kesalahan"' : ''}>Setujui</button>`);
     document.body.appendChild(b);
   });
