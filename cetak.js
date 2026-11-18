@@ -38,7 +38,7 @@ const bulanAda = kode => bulanDalam(ui.dari, ui.sampai).filter(ym => kegBulan(ko
 const BUNDEL = [ // urutan & pembagian sama dengan berkas yang diserahkan ke keuangan
   {k: 'memo', judul: 'Memo & Rekapitulasi', kertas: 'A4 tegak', ket: 'Ditandatangani Kaprodi dan Dekan.'},
   {k: 'absensi', judul: 'Absensi', kertas: 'A4 melintang', ket: 'Satu halaman per asisten per bulan.'},
-  {k: 'insentif', judul: 'Insentif', kertas: 'A4 melintang', ket: 'Rekap dan tanda terima per praktikum per bulan.'},
+  {k: 'insentif', judul: 'Insentif', kertas: 'A4 melintang', ket: 'Rekap bertanda tangan per praktikum per bulan.'},
   {k: 'laporan', judul: 'Laporan (LPJ)', kertas: 'A4 tegak', ket: 'Satu laporan per modul.'}];
 function isiBundel(k) {
   const pr = praktikumPeriode();
@@ -144,7 +144,7 @@ function docInsentif(kode, ym) {
       ${rows}<tr class="kuning b"><td colspan="${4 + semuaKol.length}">TOTAL</td><td>${angka(tot)}</td><td>${rpMemo(tot * c.tarif)}</td>${ttd ? '<td></td>' : ''}</tr></table>
       <div class="ttd" style="justify-content:flex-end;margin-right:40px"><div>Mengajukan,<br>Ketua Program Studi<div class="nm">${esc(c.kaprodi)}</div><b>NIP. ${esc(c.nipKaprodi)}</b></div></div></div></div>`;
   };
-  return halaman(false) + halaman(true);
+  return halaman(true); // Senzh 18 Nov 2026: cukup versi bertanda tangan (versi tanpa ttd dihapus)
 }
 const semuaLPJ = (kode, no) => penulisLPJ(kode, no).map(e => docLPJ(kode, no, e)).join('');
 function docLPJ(kode, no, e = penulisLPJ(kode, no)[0], nimsTambahan = []) {
